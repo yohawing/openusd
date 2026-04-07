@@ -34,6 +34,20 @@ use crate::compose::prim_index::{ArcType, Node, PrimIndex};
 use crate::sdf::schema::{ChildrenKey, FieldKey};
 use crate::sdf::{AbstractData, ListOp, Path, Payload, Reference, SpecType, Value};
 
+/// The scene's up-axis, as stored in the root layer's `upAxis` metadata.
+///
+/// USD defines two valid values: `"Y"` (Y-up, the default for many DCC tools)
+/// and `"Z"` (Z-up, used by e.g. OpenUSD's own reference scenes).
+///
+/// See <https://openusd.org/dev/api/group___usd_geom_up_axis__group.html>
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpAxis {
+    /// Y axis points up.
+    Y,
+    /// Z axis points up.
+    Z,
+}
+
 /// A composed USD stage.
 ///
 /// Owns the loaded layer stack and provides composed access to prims,
@@ -83,6 +97,34 @@ impl Stage {
     /// Returns the `defaultPrim` metadata from the root layer, if set.
     pub fn default_prim(&self) -> Option<String> {
         self.field::<String>(&Path::abs_root(), FieldKey::DefaultPrim).ok()?
+    }
+
+    /// Returns the `upAxis` metadata from the root layer, if set.
+    ///
+    /// USD defines two valid values: `"Y"` and `"Z"`.  Any other authored
+    /// value (malformed data) is treated as `None` rather than an error so
+    /// that callers can continue inspecting the rest of the stage.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use openusd::{ar, Stage, stage::UpAxis};
+    ///
+    /// let resolver = ar::DefaultResolver::new();
+    /// let stage = Stage::open(&resolver, "scene.usda").unwrap();
+    /// match stage.up_axis() {
+    ///     Some(UpAxis::Y) => println!("Y-up"),
+    ///     Some(UpAxis::Z) => println!("Z-up"),
+    ///     None => println!("upAxis not set"),
+    /// }
+    /// ```
+    pub fn up_axis(&self) -> Option<UpAxis> {
+        let raw = self.field::<String>(&Path::abs_root(), FieldKey::UpAxis).ok()??;
+        match raw.as_str() {
+            "Y" => Some(UpAxis::Y),
+            "Z" => Some(UpAxis::Z),
+            _ => None,
+        }
     }
 
     /// Returns the composed list of root prim names (children of the pseudo-root).
@@ -1074,6 +1116,45 @@ mod tests {
 
         let value = stage.field::<bool>(&Path::new("/Root")?, FieldKey::Instanceable)?;
         assert_eq!(value, None, "instanceable should be None when not authored");
+
+        Ok(())
+    }
+
+    // --- PR #2: Stage::up_axis() ---
+
+    /// A stage with `upAxis = "Y"` should return `UpAxis::Y`.
+    #[test]
+    fn up_axis_y() -> Result<()> {
+        let path = fixture_path("up_axis_y.usda");
+        let resolver = DefaultResolver::new();
+        let stage = Stage::open(&resolver, &path)?;
+
+        assert_eq!(stage.up_axis(), Some(UpAxis::Y));
+
+        Ok(())
+    }
+
+    /// A stage with `upAxis = "Z"` should return `UpAxis::Z`.
+    #[test]
+    fn up_axis_z() -> Result<()> {
+        let path = fixture_path("up_axis_z.usda");
+        let resolver = DefaultResolver::new();
+        let stage = Stage::open(&resolver, &path)?;
+
+        assert_eq!(stage.up_axis(), Some(UpAxis::Z));
+
+        Ok(())
+    }
+
+    /// A stage without an `upAxis` metadata entry should return `None`.
+    #[test]
+    fn up_axis_absent_returns_none() -> Result<()> {
+        // Use a fixture that has no upAxis authored.
+        let path = fixture_path("instanceable_metadata.usda");
+        let resolver = DefaultResolver::new();
+        let stage = Stage::open(&resolver, &path)?;
+
+        assert_eq!(stage.up_axis(), None);
 
         Ok(())
     }
