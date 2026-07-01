@@ -795,6 +795,14 @@ impl Stage {
         errors
     }
 
+    /// Returns whether `asset_path` resolves using this stage's layer registry
+    /// and resolver configuration. Relative paths are tried against the
+    /// resolver's ambient context and the real paths of currently composed
+    /// layers; this is a probe only and does not load the asset as a layer.
+    pub fn asset_resolves(&self, asset_path: &str) -> bool {
+        self.layers().asset_path_resolves(asset_path)
+    }
+
     /// Returns the current edit target — the layer that authoring methods
     /// write into.
     pub fn edit_target(&self) -> EditTarget {
@@ -2102,7 +2110,7 @@ impl Stage {
     /// Accepts both [`sdf::FieldKey`] and `&str` as the field name.
     ///
     /// [`Attribute::get`]: super::Attribute::get
-    pub(crate) fn field<T>(&self, path: impl Into<sdf::Path>, field: impl AsRef<str>) -> Result<Option<T>>
+    pub fn field<T>(&self, path: impl Into<sdf::Path>, field: impl AsRef<str>) -> Result<Option<T>>
     where
         T: TryFrom<sdf::Value>,
         T::Error: std::error::Error + Send + Sync + 'static,

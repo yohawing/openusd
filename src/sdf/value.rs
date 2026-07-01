@@ -498,7 +498,7 @@ impl_try_from_value!(Vec<gf::Mat2d>, try_as_matrix_2d_vec, "Matrix2dVec");
 impl_try_from_value!(Vec<gf::Mat3d>, try_as_matrix_3d_vec, "Matrix3dVec");
 impl_try_from_value!(Vec<gf::Matrix4d>, try_as_matrix_4d_vec, "Matrix4dVec");
 
-// Single-variant string and asset extraction. Coercing `token` → `string`
+// Single-variant string and asset extraction. Coercing `token` -> `string`
 // is [`Value::cast`]'s job.
 impl_try_from_value!(String, try_as_string, "String");
 impl_try_from_value!(Token, try_as_token, "Token");

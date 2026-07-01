@@ -1100,6 +1100,30 @@ impl LayerGraph {
         self.identifiers_of(self.order.iter().copied())
     }
 
+    /// Returns true when `asset_path` resolves through this graph's resolver
+    /// configuration, trying both the resolver's ambient search paths and each
+    /// composed layer as an anchor. This is intentionally a resolvability probe:
+    /// it does not open or parse the asset.
+    pub(crate) fn asset_path_resolves(&self, asset_path: &str) -> bool {
+        if asset_path.is_empty() {
+            return true;
+        }
+
+        let identifier = self.registry.create_identifier(asset_path, None);
+        if self.registry.resolve(&identifier).is_some() {
+            return true;
+        }
+
+        self.order.iter().copied().any(|id| {
+            let layer = &self.nodes[&id].layer;
+            if layer.is_anonymous() {
+                return false;
+            }
+            let identifier = self.registry.create_identifier_anchored(asset_path, layer.real_path());
+            self.registry.resolve(&identifier).is_some()
+        })
+    }
+
     /// Maps a sequence of layer ids to their identifiers, in order.
     pub(crate) fn identifiers_of(&self, ids: impl IntoIterator<Item = LayerId>) -> Vec<String> {
         ids.into_iter().map(|id| self.identifier(id).to_string()).collect()

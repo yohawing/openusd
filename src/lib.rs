@@ -104,3 +104,15 @@ pub mod usd;
 pub mod usda;
 pub mod usdc;
 pub mod usdz;
+pub mod yw_look_compat;
+
+pub mod stage {
+    pub use crate::usd::{Stage, StageBuilder};
+    pub use crate::yw_look_compat::{
+        GeomSubsetData, MaterialData, MeshData, SkelAnimationData, SkeletonData, SkippedPayload, StageLoadPolicy,
+        UpAxis,
+    };
+}
+
+pub use usd::{Stage, StageBuilder};
+pub use yw_look_compat::StageLoadPolicy;
