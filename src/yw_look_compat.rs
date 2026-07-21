@@ -607,19 +607,19 @@ fn read_mat4_vec_attr(stage: &Stage, prim_path: &sdf::Path, name: &str) -> Optio
     let attr_path = prim_path.append_property(name).ok()?;
     let value: Option<Value> = stage.field(attr_path, FieldKey::Default).ok().flatten();
     match value? {
-        Value::Matrix4dVec(v) => Some(v.into_iter().map(|m| row_major_mat4_to_column_major_f32(m.0)).collect()),
+        Value::Matrix4dVec(v) => Some(v.into_iter().map(|m| mat4_f64_to_f32(m.0)).collect()),
         _ => None,
     }
 }
 
-fn row_major_mat4_to_column_major_f32(row_major: [f64; 16]) -> [f32; 16] {
-    let mut out = [0.0_f32; 16];
-    for row in 0..4 {
-        for col in 0..4 {
-            out[col * 4 + row] = row_major[row * 4 + col] as f32;
-        }
-    }
-    out
+/// USD's row-major, row-vector matrix layout (translation at flat indices
+/// 12–14) is element-for-element identical to glTF's column-major,
+/// column-vector layout, so the only conversion needed is the f64 → f32
+/// cast. Transposing here would move the translation into the projection
+/// slots and invert the rotation basis — the "exploded skeleton" bug that
+/// broke every rig with non-identity joint transforms.
+fn mat4_f64_to_f32(m: [f64; 16]) -> [f32; 16] {
+    m.map(|v| v as f32)
 }
 
 fn joint_parents(joints: &[String]) -> Vec<Option<usize>> {
@@ -714,20 +714,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn mat4_conversion_transposes_row_major_to_column_major() {
-        let row_major = [
-            1.0, 2.0, 3.0, 4.0, //
-            5.0, 6.0, 7.0, 8.0, //
-            9.0, 10.0, 11.0, 12.0, //
-            13.0, 14.0, 15.0, 16.0,
+    fn mat4_conversion_preserves_usd_flat_layout() {
+        // USD row-major/row-vector flat layout == glTF column-major
+        // flat layout, so conversion is a pure f64 -> f32 cast: a
+        // translation must stay at flat indices 12-14.
+        let usd_translate_z = [
+            1.0, 0.0, 0.0, 0.0, //
+            0.0, 1.0, 0.0, 0.0, //
+            0.0, 0.0, 1.0, 0.0, //
+            0.0, 0.0, 0.875, 1.0,
         ];
         assert_eq!(
-            row_major_mat4_to_column_major_f32(row_major),
+            mat4_f64_to_f32(usd_translate_z),
             [
-                1.0, 5.0, 9.0, 13.0, //
-                2.0, 6.0, 10.0, 14.0, //
-                3.0, 7.0, 11.0, 15.0, //
-                4.0, 8.0, 12.0, 16.0,
+                1.0, 0.0, 0.0, 0.0, //
+                0.0, 1.0, 0.0, 0.0, //
+                0.0, 0.0, 1.0, 0.0, //
+                0.0, 0.0, 0.875, 1.0,
             ]
         );
     }

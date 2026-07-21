@@ -662,9 +662,13 @@ impl<R: io::Read + io::Seek> CrateFile<R> {
             let code = self.reader.read_pod::<u8>()?;
 
             match code {
-                // Compressed integers
+                // Compressed integers. Pixar's `_ReadCompressedInts` runs the
+                // LZ4 block through `Usd_IntegerCompression` decoding after
+                // decompression, so the payload must be integer-decoded
+                // (`read_encoded_ints`), not reinterpreted as raw `i32`s
+                // straight out of LZ4.
                 b'i' => {
-                    let ints: Vec<i32> = self.read_compressed(count)?;
+                    let ints: Vec<i32> = self.read_encoded_ints(count)?;
                     ints.into_iter().map(|i| cast(i).unwrap()).collect()
                 }
                 // Lookup table and indexes
